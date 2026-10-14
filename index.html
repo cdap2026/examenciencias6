@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examen Acumulativo - Ciencias de la Creación (Grado 6°)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary: #003366;
+            --secondary: #00509e;
+            --accent: #f4b41a;
+            --light: #f8f9fa;
+            --danger: #d32f2f;
+            --success: #2e7d32;
+            --text: #333;
+        }
+        * { box-sizing: border-box; font-family: 'Arial', sans-serif; }
+        body { margin: 0; padding: 0; background-color: #eaeff3; color: var(--text); user-select: none; -webkit-user-select: none; }
+        .banner { width: 100%; height: 180px; background-image: url('6°_CIENCIAS DE LA CREACIÓN.png'); background-size: cover; background-position: center; border-bottom: 4px solid var(--accent); }
+        .container { max-width: 950px; margin: 20px auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
+        h1, h2, h3 { color: var(--primary); }
+        
+        /* Top Bar: Timer and Mic */
+        .top-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .top-bar-section { display: flex; align-items: center; gap: 20px; }
+        
+        /* Audio Meter */
+        .mic-container { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);}
+        .mic-bar-bg { width: 120px; height: 12px; background: #444; border-radius: 6px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);}
+        .mic-bar-fill { height: 100%; width: 0%; background: #4caf50; transition: width 0.1s, background 0.2s; }
+        
+        .alert { background: #ffebee; color: var(--danger); padding: 20px; border-left: 6px solid var(--danger); margin-bottom: 25px; font-weight: bold; border-radius: 4px; font-size: 1.1em; line-height: 1.5;}
+        .btn { background: var(--secondary); color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; transition: 0.3s; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
+        .btn:hover { background: var(--primary); transform: translateY(-2px);}
+        .btn:disabled { background: #b0bec5; cursor: not-allowed; transform: none; box-shadow: none; color: #555;}
+        .hidden { display: none !important; }
+        
+        /* Preguntas */
+        .question-block { background: var(--light); padding: 30px; border-radius: 8px; border: 1px solid #cfd8dc; margin-bottom: 25px; font-size: 1.1em; line-height: 1.6;}
+        .context { background: white; padding: 20px; border-left: 4px solid var(--accent); color: #455a64; margin-bottom: 25px; font-size: 1.05em; border-radius: 0 8px 8px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: justify;}
+        .options label { display: block; margin: 15px 0; cursor: pointer; padding: 15px; border-radius: 6px; border: 2px solid #e0e0e0; background: white; transition: 0.2s; font-weight: normal;}
+        .options label:hover { background: #f1f8ff; border-color: var(--secondary); }
+        .options input { margin-right: 15px; transform: scale(1.3); }
+        
+        textarea { width: 100%; padding: 20px; border: 2px solid #ccc; border-radius: 6px; resize: vertical; font-size: 1.1em; margin-top: 15px; line-height: 1.5; user-select: text; -webkit-user-select: text;}
+        textarea:focus { border-color: var(--secondary); outline: none; }
+        .student-info input { width: 100%; padding: 15px; font-size: 18px; border: 2px solid #ccc; border-radius: 5px; margin-bottom: 25px; user-select: text; -webkit-user-select: text;}
+        
+        #overlay-blocker { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.98); z-index:9999; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding: 30px; }
+        .progress-text { font-size: 1.4em; font-weight: bold; color: var(--secondary); text-align: center; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;}
+        
+        /* Contador de caracteres para pregunta abierta */
+        .char-counter { text-align: right; font-size: 0.9em; color: #666; margin-top: 5px; font-weight: bold;}
+        .char-counter.invalid { color: var(--danger); }
+        .char-counter.valid { color: var(--success); }
+    </style>
+</head>
+<body oncopy="return false" oncut="return false" onpaste="return false">
+
+    <div class="top-bar hidden" id="topBar">
+        <div class="top-bar-section">
+            <span id="displayStudentName" style="font-size: 1.2em;">Estudiante</span>
+            <span id="warningsDisplay" style="color: var(--accent); font-weight:bold; font-size: 1.2em;">Faltas: 0/1</span>
+        </div>
+        
+        <div class="top-bar-section">
+            <div class="mic-container">
+                <span style="font-size: 0.9em; font-weight: bold;">RUIDO (dB):</span>
+                <div class="mic-bar-bg"><div class="mic-bar-fill" id="micLevel"></div></div>
+            </div>
+            <span style="font-size: 1.4em; font-weight:bold;">TIEMPO: <strong id="timeDisplay" style="color:var(--accent);">00:00</strong></span>
+        </div>
+    </div>
+
+    <header class="banner"></header>
+
+    <div class="container" id="startScreen">
+        <div style="text-align: center;">
+            <h1 style="font-size: 2.5em; margin-bottom: 10px;">Examen Acumulativo - I Corte</h1>
+            <h2 style="color: #555; margin-top: 0;">Ciencias de la Creación - 6° Grado</h2>
+        </div>
+        
+        <div class="alert">
+            <strong>⚠️ LEYES DEL EXAMEN (LEE ATENTAMENTE):</strong><br><br>
+            1. <strong>Bloqueo de Avance y Tiempos:</strong> Tendrás 1.5 minutos para leer y responder cada pregunta cerrada, y 5 minutos para cada abierta. El sistema avanzará <strong>automáticamente</strong> al finalizar el tiempo.<br>
+            2. <strong>Longitud Mínima:</strong> En las preguntas abiertas, el sistema NO te dejará avanzar si no escribes <strong>al menos 5 líneas completas</strong> de respuesta. Si se acaba el tiempo y no has cumplido, quedarás bloqueado hasta que escribas lo suficiente.<br>
+            3. <strong>Bloqueo de Pestaña:</strong> Salir de la pestaña descuenta 1.0 punto la primera vez. A la segunda, se cierra el examen con la nota actual.<br>
+            4. <strong>Fraude:</strong> Copiar, pegar y minimizar están deshabilitados. Se medirá el ruido de tu entorno constantemente.
+        </div>
+        
+        <div class="student-info">
+            <label style="font-size: 1.2em; color: var(--primary);"><strong>Nombre Completo:</strong></label>
+            <input type="text" id="studentName" placeholder="Ej: Juan Pérez González..." required autocomplete="off">
+        </div>
+        <button class="btn" onclick="requestMicAndStart()" style="width:100%; font-size: 22px; padding: 20px; background:var(--primary);">Aceptar Condiciones e Iniciar Prueba</button>
+    </div>
+
+    <div class="container hidden" id="examScreen">
+        <div class="progress-text" id="progressIndicator">Pregunta 1 de 20</div>
+        
+        <div id="question-container"></div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button type="button" class="btn" id="btnNext" disabled>Esperando tiempo estipulado...</button>
+        </div>
+    </div>
+
+    <div id="overlay-blocker" class="hidden">
+        <h1 style="color: var(--danger); font-size: 56px; margin-bottom:10px;">EXAMEN ANULADO</h1>
+        <h2>Has violado el protocolo de seguridad de pestañas.</h2>
+        <p style="font-size: 22px; max-width: 600px; margin: 20px auto;">Se ha aplicado una severa penalización. El sistema ha generado automáticamente un reporte con tu avance parcial hasta el momento de la infracción.</p>
+        <div id="qr-failed" style="margin-top: 30px; padding: 20px; background: white; border: 5px solid var(--danger); display: inline-block;"></div>
+    </div>
+
+    <div class="container hidden" id="resultScreen" style="text-align: center;">
+        <h1 style="color: var(--primary); font-size: 3em;">¡Prueba Finalizada!</h1>
+        <h2 style="margin-top: 30px; font-size: 2em;">Nota Preguntas Cerradas: <br><span id="finalScore" style="background:var(--light); padding:15px 30px; border-radius:10px; border:3px solid var(--accent); display:inline-block; margin-top:15px;"></span></h2>
+        <p style="color: #666; margin: 30px 0; font-size: 1.2em;">*Nota sujeta a modificación. El docente evaluará manualmente tus 5 preguntas de desarrollo.</p>
+        <p style="font-weight: bold; font-size: 1.3em; color: var(--primary);">Tu informe PDF ha sido descargado. Presenta este QR al profesor.</p>
+        <div style="display: flex; justify-content: center; margin-top: 40px;">
+            <div id="qr-success" style="padding: 20px; background: white; border: 5px solid var(--secondary); border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- BANCO DE PREGUNTAS EXTENSAS ---
+        const closedQuestions = [
+            { 
+                ctx: "Durante una expedición en las selvas de la Amazonía, un grupo de biólogos descubrió un organismo que no se parecía a nada registrado en los libros de texto locales. Para poder presentarlo ante la comunidad científica internacional, el líder de la expedición explicó que debían utilizar una ciencia específica. Esta ciencia no solo se encargaría de ponerle un nombre al organismo, sino que estudiaría profundamente su historia evolutiva, comparando su ADN con el de especies extintas para ubicarlo en el gran árbol de la vida. Muchos estudiantes de biología suelen confundir esta rama de estudio con otra que únicamente se dedica a catalogar y poner nombres en latín.", 
+                q: "¿Cuál es la diferencia principal entre sistemática y taxonomía descrita en el contexto?", 
+                options: ["Sistemática busca relaciones evolutivas, taxonomía nombra y clasifica.", "Taxonomía estudia fósiles, sistemática estudia plantas vivas silvestres.", "Sistemática asigna nombres en latín, taxonomía agrupa por el color.", "Taxonomía clasifica por tamaño, sistemática por ecosistemas nativos."], 
+                ans: 0 
+            },
+            { 
+                ctx: "A mediados del siglo XVIII, un botánico sueco llamado Carlos Linneo se dio cuenta de que la forma en que los científicos llamaban a las plantas era un caos total. Cada país usaba nombres larguísimos y diferentes. Linneo decidió crear un sistema de cajas dentro de cajas, como si fueran muñecas rusas. Creó grandes grupos que contenían grupos más pequeños basados en características físicas compartidas, desde el reino animal o vegetal hasta llegar a la unidad más básica e indivisible de la clasificación. Este sistema jerárquico fue tan brillante que, con algunas modificaciones modernas, es el mismo que utilizan los científicos hoy en día.", 
+                q: "¿Cuál es el orden correcto de las categorías taxonómicas, desde la más amplia a la más específica?", 
+                options: ["Dominio, Reino, Filo, Clase, Orden, Familia, Género, Especie.", "Reino, Dominio, Clase, Filo, Orden, Género, Familia, Especie.", "Dominio, Reino, Clase, Filo, Familia, Orden, Género, Especie.", "Reino, Dominio, Filo, Clase, Familia, Orden, Especie, Género."], 
+                ans: 0 
+            },
+            { 
+                ctx: "Imagina que eres un explorador que acaba de descubrir un nuevo tipo de felino en las montañas andinas de Colombia. Sabes que pertenece a la familia de los pumas, pero tiene características únicas. Para registrar tu descubrimiento oficialmente, debes usar la nomenclatura binomial, el lenguaje universal de la ciencia inventado hace siglos. Este sistema requiere que le des a tu nuevo felino un nombre compuesto estrictamente por dos palabras latinizadas. Al escribirlo en tu informe para la revista científica, debes seguir una regla ortográfica internacional inquebrantable para que el nombre sea validado por los revisores.", 
+                q: "¿Qué categorías componen el nombre científico y cómo deben escribirse correctamente?", 
+                options: ["La familia siempre en mayúscula y el orden taxonómico en minúscula.", "El género escrito con mayúscula inicial y la especie en minúscula.", "El reino escrito totalmente en mayúscula y el filo en minúsculas.", "La clase escrita en minúscula y el género con la inicial mayúscula."], 
+                ans: 1 
+            },
+            { 
+                ctx: "Un estudiante de sexto grado encuentra un insecto extraño en el patio de su escuela. Para descubrir de qué especie se trata, su profesor de ciencias le entrega una hoja de papel con una 'Clave Dicotómica'. El profesor le explica que este documento funciona como un mapa de decisiones o un juego de 'elige tu propia aventura'. Para avanzar en el mapa, el estudiante debe observar detalladamente al insecto y leer el paso número uno, el cual le obligará a tomar una decisión excluyente entre dos opciones que describen partes físicas del animal. Si el documento estuviera mal diseñado y diera tres opciones en lugar de dos, dejaría de ser dicotómico.", 
+                q: "Según la explicación del profesor, ¿qué es indispensable para que una clave dicotómica funcione?", 
+                options: ["Debe basarse estrictamente en el comportamiento temporal del animal.", "Debe ofrecer siempre dos características físicas opuestas y observables.", "Debe utilizar únicamente características genéticas de un laboratorio.", "Debe incluir el nombre común local del organismo a identificar al inicio."], 
+                ans: 1 
+            },
+            { 
+                ctx: "Durante una excursión a las frías montañas del norte del país, una clase de biología observa un inmenso bosque de árboles muy altos. Los estudiantes notan que estos árboles no pierden sus hojas durante el duro invierno. Al acercarse, descubren que las hojas no son anchas ni planas, sino que tienen forma de agujas verdes y duras, cubiertas por una cera protectora. Al buscar flores o frutos carnosos en las ramas, no encuentran ninguno; en su lugar, hallan unas estructuras duras de madera en forma de cono o 'piñas' que contienen semillas descubiertas en su interior, expuestas al aire helado.", 
+                q: "Las características de semillas desnudas, hojas en aguja y ausencia de verdaderas flores indican que son:", 
+                options: ["Plantas angiospermas adaptadas para sobrevivir en la selva caliente.", "Plantas gimnospermas típicas de regiones muy frías y montañosas.", "Helechos gigantes que se reproducen únicamente mediante esporas.", "Musgos primitivos sin tejidos conductores para el agua y nutrientes."], 
+                ans: 1 
+            },
+            { 
+                ctx: "En el museo de historia natural, un guía explica que la taxonomía funciona como la organización de una gran ciudad. Si dos animales viven en la misma 'casa' (especie), obviamente comparten la misma calle, el mismo barrio y la misma ciudad. De igual forma, en la biología, si dos organismos son clasificados dentro de una categoría muy específica y pequeña, automáticamente deben compartir todas las categorías más grandes y amplias que se encuentran por encima de ella en la pirámide de clasificación, ya que los grupos menores siempre están contenidos dentro de los grupos mayores sin excepción.", 
+                q: "Si dos animales comparten la misma 'Familia' taxonómica, obligatoriamente deben compartir también:", 
+                options: ["El mismo género biológico y exactamente la misma especie biológica.", "El mismo orden biológico, la misma clase biológica y el mismo filo.", "La misma especie biológica pero con algunas variaciones en el color.", "El mismo género biológico pero pueden ser de reinos muy diferentes."], 
+                ans: 1 
+            },
+            { 
+                ctx: "El Reino Plantae es increíblemente diverso. Incluye desde diminutas plantas que crecen como alfombras verdes sobre las rocas húmedas de las cascadas, hasta gigantescos árboles de mango que producen frutos dulces en los patios de las casas. Las plantas más primitivas de este reino, aquellas que cubren las rocas húmedas, nunca crecen altas porque carecen de tuberías internas (xilema y floema) para bombear agua desde el suelo en contra de la gravedad. Por el contrario, los grandes árboles frutales han desarrollado complejos sistemas vasculares que les permiten transportar agua y nutrientes a decenas de metros de altura.", 
+                q: "¿Qué característica anatómica clave separa a los musgos de los grandes árboles frutales?", 
+                options: ["La ausencia total de vasos conductores (xilema y floema) internos.", "La capacidad exclusiva de realizar la fotosíntesis en la oscuridad.", "La presencia obligatoria de hojas compuestas con muchos folíolos.", "La necesidad estricta de vivir únicamente en zonas desérticas secas."], 
+                ans: 0 
+            },
+            { 
+                ctx: "Si observas a tu alrededor en un parque primaveral, notarás que la gran mayoría de las plantas tienen hermosos colores en las puntas de sus tallos. Estas plantas coloridas, conocidas como angiospermas, dominan casi todos los ecosistemas terrestres del mundo moderno. Han logrado este asombroso éxito evolutivo gracias a una estructura exclusiva que no poseen los pinos ni los helechos. Esta estructura no solo atrae a insectos y aves con su néctar y colores para esparcir el polen, sino que también es la pieza fundamental que usan los científicos para identificar a qué familia exacta pertenece la planta.", 
+                q: "¿Qué función biológica y taxonómica cumple la flor en el grupo de las angiospermas?", 
+                options: ["Es el órgano encargado de absorber los minerales desde el subsuelo.", "Es el órgano reproductor especializado y clave para clasificarlas.", "Es la parte responsable de almacenar grandes cantidades de agua.", "Es el tejido vascular primario que transporta azúcares en la planta."], 
+                ans: 1 
+            },
+            { 
+                ctx: "Estás sentado en el laboratorio de botánica con una misteriosa hoja en la mano. El profesor te ha pedido que uses un libro gigante que contiene una intrincada clave dicotómica para descubrir el nombre del árbol. Lées el Paso 1: '1a. La hoja tiene forma de aguja... Ir al Paso 2. / 1b. La hoja es ancha y plana... Ir al Paso 4'. Al mirar tu hoja, notas que es ancha como la palma de tu mano, así que seleccionas la opción 1b. Para que la clave funcione correctamente y no te pierdas en el libro, debes seguir la instrucción precisa que te acaba de dar esa opción ganadora y omitir el resto.", 
+                q: "Si la afirmación seleccionada te instruye 'Ir al paso 4', ¿cuál es tu siguiente acción correcta?", 
+                options: ["Anotar el primer nombre científico que encuentres y terminar rápido.", "Saltar los pasos 2 y 3, y leer inmediatamente las opciones del paso 4.", "Volver a leer el inicio de la clave para confirmar la opción contraria.", "Cortar la hoja a la mitad para observar su estructura interna vascular."], 
+                ans: 1 
+            },
+            { 
+                ctx: "Los botánicos usan trucos visuales muy sencillos para clasificar rápidamente a las plantas con flores sin tener que llevarlas al microscopio. Uno de los trucos más efectivos es mirar las 'venas' u oscuras líneas estructurales (nervaduras) que recorren las hojas. Las plantas dicotiledóneas, como un roble o un árbol de frijol, tienen venas que se ramifican como si fueran los ríos en un mapa o las grietas en un cristal roto. Sin embargo, las plantas monocotiledóneas, como el césped de un estadio de fútbol, el maíz o las hojas largas de una palma, tienen un diseño geométrico mucho más ordenado y lineal.", 
+                q: "Las plantas monocotiledóneas suelen presentar hojas con nervaduras de tipo:", 
+                options: ["Totalmente ausentes, dejando la lámina de la hoja completamente lisa.", "Ramificadas, formando una extensa red desordenada como en los robles.", "Paralelas, extendiéndose en líneas rectas a lo largo de toda la hoja.", "En forma de pequeños círculos concéntricos localizados en los bordes."], 
+                ans: 2 
+            },
+            { 
+                ctx: "En una granja, un agricultor decide cruzar una yegua (caballo hembra) con un burro macho. El resultado de este cruce es un animal muy fuerte y trabajador conocido como 'mula'. A primera vista, alguien podría pensar que si el caballo y el burro pueden aparearse y tener crías, entonces pertenecen exactamente a la misma especie biológica. Sin embargo, los biólogos de todo el mundo clasifican al caballo y al burro como dos especies totalmente distintas. Esto se debe a una regla de oro en la biología reproductiva que se evidencia cuando el agricultor intenta que dos mulas se reproduzcan entre sí sin éxito.", 
+                q: "¿Por qué el caballo y el burro se consideran especies distintas, a pesar de que pueden aparearse?", 
+                options: ["Porque su descendencia (la mula) nace con una esterilidad biológica.", "Porque habitan naturalmente en continentes completamente separados.", "Porque pertenecen a reinos y dominios taxonómicos muy diferentes.", "Porque uno es herbívoro estricto y el otro se alimenta de insectos."], 
+                ans: 0 
+            },
+            { 
+                ctx: "El Reino Vegetal se divide en grandes grupos o 'Divisiones' (equivalentes al Filo en los animales). Una de las divisiones más exitosas e importantes para la ecología global son las Traqueofitas. Hace millones de años, las primeras plantas estaban confinadas a vivir pegadas al suelo en pantanos húmedos. Pero las Traqueofitas revolucionaron el mundo vegetal desarrollando una tecnología interna asombrosa: crearon conductos microscópicos formados por células endurecidas que funcionaban como tuberías de acueducto, permitiéndoles extraer agua profunda y desafiar la gravedad para convertirse en árboles gigantes.", 
+                q: "¿Qué rasgo anatómico fundamental define a las plantas clasificadas como Traqueofitas?", 
+                options: ["Su reproducción exclusiva a través de pequeñas esporas transportadas.", "La presencia evolutiva de tejidos vasculares reales (xilema y floema).", "La carencia total de raíces verdaderas, dependiendo solo de rizoides.", "La capacidad de sobrevivir indefinidamente sin requerir luz solar directa."], 
+                ans: 1 
+            },
+            { 
+                ctx: "Un grupo de científicos necesita crear un manual para que los guardaparques puedan identificar los tipos de arbustos en una reserva natural. Les piden a sus estudiantes que ayuden a escribir las opciones de la clave dicotómica. Un estudiante propone usar el color exacto de las hojas a las 3 de la tarde; otro propone usar el peso de la planta después de llover. El profesor rechaza ambas opciones explicando que una buena clave taxonómica debe basarse en características anatómicas permanentes, que no cambien según el clima, la edad o el estado de ánimo de quien observa, sino que formen parte de la estructura fija del organismo.", 
+                q: "¿Cuál de las siguientes es una buena característica para usar en una clave dicotómica botánica?", 
+                options: ["El tamaño exacto y milimétrico que alcanzará la planta en veinte años.", "La presencia o ausencia constante de pequeñas vellosidades en el tallo.", "La cantidad exacta de luz solar que la planta recibió durante la tarde.", "El nombre del país, la región o la ciudad donde fue comprada la planta."], 
+                ans: 1 
+            },
+            { 
+                ctx: "Durante muchos años, el Panda Rojo fue clasificado por los zoólogos dentro de la familia de los osos, y luego lo movieron a la familia de los mapaches porque se parecía físicamente a ellos. La taxonomía parecía estar equivocada constantemente. Sin embargo, en la década de los 2000, los avances tecnológicos permitieron a los científicos extraer muestras de sangre del Panda Rojo y leer su código genético completo. Sorprendentemente, los resultados mostraron que no era un oso ni un mapache, sino el único representante vivo de una familia independiente. Este caso demostró que el sistema taxonómico no está escrito en piedra.", 
+                q: "¿Qué suceso moderno puede provocar que una especie cambie radicalmente de familia taxonómica?", 
+                options: ["El descubrimiento de que la especie cambió ligeramente de tono o color.", "Un riguroso análisis de ADN que demuestre relaciones evolutivas distintas.", "La observación de que la especie ahora habita en un parque muy diferente.", "Un cambio climático que obliga a la especie a alterar su dieta diaria."], 
+                ans: 1 
+            },
+            { 
+                ctx: "Estás caminando por un sendero ecológico y encuentras una hoja caída de un árbol misterioso. Para empezar a identificarla utilizando tu libro de botánica, no necesitas mirar por un microscopio ni hacerle pruebas químicas. El primer paso del libro te pide simplemente que pases el dedo por el borde o margen de la hoja. Al hacerlo, sientes que no es liso, sino que tiene pequeños dientes afilados como si fuera el filo de un cuchillo para cortar pan. En botánica, estas características externas que se pueden ver a simple vista son fundamentales para el primer descarte rápido.", 
+                q: "Si encuentras una planta con bordes de hojas aserrados, estás observando una característica:", 
+                options: ["Fisiológica y química profunda.", "Genética y molecular celular.", "Ecológica y de entorno ambiental.", "Morfológica y física externa."], 
+                ans: 3 
+            }
+        ];
+
+        const openQuestions = [
+            {
+                ctx: "Durante la época de los descubrimientos, un mismo animal podía tener hasta 15 nombres distintos dependiendo del idioma y la región. Un pájaro que en Inglaterra llamaban 'Redbreast', en España era 'Petirrojo' y en Francia 'Rougegorge'. Además, si un científico en Alemania escribía un artículo sobre las propiedades curativas de una planta usando su nombre local, los médicos en Italia no sabían de qué planta estaba hablando. El sistema de Nomenclatura Binomial implementado por Carlos Linneo en latín cambió la historia de la ciencia al darle a cada organismo una 'cédula de identidad' universal.",
+                q: "16. Basado en el contexto anterior y lo aprendido en clase, explica ampliamente con tus propias palabras qué importancia crítica tiene la nomenclatura binomial (nombre científico) para el progreso de la ciencia y para evitar confusiones a nivel internacional."
+            },
+            {
+                ctx: "Los bosques de pinos de las regiones boreales y las selvas tropicales llenas de orquídeas y árboles frutales representan los dominios de dos grandes grupos de plantas: las Gimnospermas y las Angiospermas. A pesar de que ambos grupos han logrado un éxito evolutivo masivo produciendo semillas para reproducirse (a diferencia de los helechos), la forma en que protegen esas semillas y la manera en que sus órganos reproductores interactúan con el medio ambiente (el viento frente a los insectos polinizadores) son completamente distintas, marcando una separación morfológica abismal entre ambos grupos.",
+                q: "17. Analiza y menciona al menos dos diferencias morfológicas contundentes entre las plantas Gimnospermas y Angiospermas. Justifica tu respuesta y proporciona un ejemplo claro de cada una."
+            },
+            {
+                ctx: "Acabas de ser contratado como taxónomo jefe en una expedición botánica. Tu equipo acaba de recolectar tres especímenes totalmente nuevos para la ciencia. La Planta A es un árbol gigantesco que tiene hojas delgadas con forma de aguja y unas estructuras duras parecidas a piñas. La Planta B es un arbusto mediano con hojas muy anchas y enormes flores de color rojo brillante. La Planta C es diminuta, parece una alfombra verde húmeda, crece pegada a las rocas y carece por completo de raíces verdaderas y conductos internos. Tu deber es crear una herramienta para los exploradores novatos.",
+                q: "18. Redacta y diseña una clave dicotómica sencilla (de dos pasos formales) que permita a cualquier persona inexperta clasificar y separar correctamente a la Planta A, Planta B y Planta C basándose únicamente en su morfología externa."
+            },
+            {
+                ctx: "Imagina un gigantesco archivo de biblioteca. La taxonomía sería el bibliotecario que se encarga de ponerle etiquetas a cada libro, agruparlos por color y ordenarlos cuidadosamente en los estantes para que la biblioteca se vea limpia y organizada. Sin embargo, si no existiera la sistemática, el bibliotecario agruparía libros de ciencia ficción junto a manuales de cocina solo porque ambos tienen portadas azules. La sistemática es el experto que lee la historia evolutiva dentro de cada libro y le indica al bibliotecario qué libros son realmente familia y deben ir juntos, basándose en su origen real y no solo en las apariencias.",
+                q: "19. Utilizando la analogía del bibliotecario o tus propias palabras, explica de manera detallada por qué se afirma en la biología moderna que la sistemática apoya y fundamenta a la taxonomía."
+            },
+            {
+                ctx: "Cuando los científicos analizan la estructura de las células, la complejidad geométrica de una hoja, o la asombrosa organización jerárquica de la vida (desde la especie hasta los grandes reinos), encuentran patrones repetitivos y leyes matemáticas precisas. La taxonomía nos demuestra que la vida no es un caos desordenado, sino que existe una categorización perfecta donde los seres vivos encajan en cajas maravillosamente diseñadas. Desde el punto de vista de la fe y las Ciencias de la Creación, este asombroso nivel de organización sistemática es un reflejo del carácter del Creador.",
+                q: "20. Desde la perspectiva y cosmovisión de las Ciencias de la Creación estudiadas en este cuarto periodo, ¿cómo evidencia el asombroso orden y la clasificación taxonómica de los seres vivos la existencia de un diseño inteligente e intencionado en la naturaleza?"
+            }
+        ];
+
+        // --- VARIABLES DE ESTADO ---
+        let currentQuestionIndex = 0;
+        const totalQuestions = closedQuestions.length + openQuestions.length; // 15 + 5 = 20
+        let questionTimerInterval;
+        let timeRemaining = 0;
+        
+        let answersClosed = new Array(closedQuestions.length).fill(null);
+        let answersOpen = new Array(openQuestions.length).fill("");
+
+        // Seguridad
+        let isExamActive = false;
+        let warnings = 0;
+        let penalty = 0.0;
+        let studentName = "";
+
+        // Medidor Audio
+        let audioContext, analyser, microphone, dataArray;
+        let isMicActive = false;
+
+        // --- SISTEMA ANTI-TRAMPAS (Cambio Pestaña) ---
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden && isExamActive) {
+                warnings++;
+                document.getElementById('warningsDisplay').innerText = `Faltas: ${warnings}/1`;
+                
+                if (warnings === 1) {
+                    penalty = 1.0;
+                    alert("⚠️ VIOLACIÓN GRAVE DE SEGURIDAD ⚠️\nEl sistema ha detectado que minimizaste o saliste de la pestaña del examen.\n\nPENALIZACIÓN: Se te ha descontado 1.0 punto directo de tu nota final.\n\nSi vuelves a salir, el sistema anulará inmediatamente tu prueba y enviará un reporte de fraude a tu docente.");
+                } else if (warnings >= 2) {
+                    endExam(true); 
+                }
+            }
+        });
+
+        // --- INICIO DE EXAMEN Y MICRÓFONO ---
+        async function requestMicAndStart() {
+            const nameInput = document.getElementById('studentName').value.trim();
+            if(!nameInput) { alert("ERROR: Es estrictamente obligatorio ingresar tu nombre completo para iniciar el examen."); return; }
+            studentName = nameInput;
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                setupAudioMeter(stream);
+            } catch (err) {
+                alert("ACCESO DENEGADO: El protocolo de seguridad exige el uso del micrófono para monitorizar el ruido ambiente. Permite el acceso para poder iniciar la prueba.");
+                return;
+            }
+
+            document.getElementById('displayStudentName').innerText = studentName;
+            
+            if(document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(e => console.log(e));
+            }
+
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('examScreen').classList.remove('hidden');
+            document.getElementById('topBar').classList.remove('hidden');
+            
+            isExamActive = true;
+            loadQuestion(0);
+        }
+
+        function setupAudioMeter(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
+            analyser.fftSize = 256;
+            dataArray = new Float32Array(analyser.fftSize);
+            isMicActive = true;
+            updateMicMeter();
+        }
+
+        function updateMicMeter() {
+            if(!isMicActive) return;
+            requestAnimationFrame(updateMicMeter);
+            analyser.getFloatTimeDomainData(dataArray);
+            
+            let sumSquares = 0.0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sumSquares += dataArray[i] * dataArray[i];
+            }
+            let rms = Math.sqrt(sumSquares / dataArray.length);
+            let db = 20 * Math.log10(rms); 
+            let displayPercent = Math.max(0, Math.min(100, (db + 80) * (100/80))); 
+            
+            const micBar = document.getElementById('micLevel');
+            micBar.style.width = displayPercent + '%';
+            
+            if(displayPercent > 65) {
+                micBar.style.background = "#d32f2f"; 
+            } else if (displayPercent > 40) {
+                micBar.style.background = "#fbc02d"; 
+            } else {
+                micBar.style.background = "#4caf50"; 
+            }
+        }
+
+        // --- LÓGICA DE PAGINACIÓN, TIEMPOS Y VALIDACIÓN ---
+        function loadQuestion(index) {
+            currentQuestionIndex = index;
+            document.getElementById('progressIndicator').innerText = `Pregunta ${index + 1} de ${totalQuestions}`;
+            
+            const container = document.getElementById('question-container');
+            let html = "";
+            let timeLimit = 0;
+
+            if (index < closedQuestions.length) {
+                // PREGUNTA CERRADA (1.5 Minutos = 90 segundos)
+                timeLimit = 90; 
+                let q = closedQuestions[index];
+                html = `
+                    <div class="question-block">
+                        <div class="context"><strong>LECTURA DE CONTEXTO:</strong><br>${q.ctx}</div>
+                        <strong style="font-size: 1.2em; color:var(--primary);">${index + 1}. ${q.q}</strong>
+                        <div class="options">
+                `;
+                q.options.forEach((opt, optIdx) => {
+                    html += `<label><input type="radio" name="currentQ" value="${optIdx}"> ${String.fromCharCode(65 + optIdx)}) ${opt}</label>`;
+                });
+                html += `</div></div>`;
+            } else {
+                // PREGUNTA ABIERTA (5 Minutos = 300 segundos)
+                timeLimit = 300; 
+                let openIndex = index - closedQuestions.length;
+                let qData = openQuestions[openIndex];
+                html = `
+                    <div class="question-block">
+                        <div style="background:var(--accent); color:white; padding:5px 15px; border-radius:5px; display:inline-block; font-weight:bold; margin-bottom:10px;">PREGUNTA DE DESARROLLO ESTRICTO</div>
+                        <div class="context"><strong>ANÁLISIS DE CONTEXTO:</strong><br>${qData.ctx}</div>
+                        <strong style="font-size: 1.2em; color:var(--primary);">${qData.q}</strong>
+                        <textarea id="openAnswer" rows="8" placeholder="Redacta tu respuesta aquí. Recuerda que para que sea válida y poder avanzar, tu texto debe tener una extensión aproximada de al menos 5 líneas completas..." oncopy="return false" onpaste="return false" oncut="return false"></textarea>
+                        <div id="charCounter" class="char-counter invalid">Caracteres digitados: 0 / 300 (Mínimo requerido)</div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+            timeRemaining = timeLimit;
+            document.getElementById('btnNext').innerText = "Bloqueo Activo - Esperando tiempo...";
+            document.getElementById('btnNext').disabled = true;
+            document.getElementById('btnNext').style.background = "#b0bec5";
+            
+            clearInterval(questionTimerInterval);
+            updateTimerDisplay();
+
+            // Configurar listener para contador de caracteres si es pregunta abierta
+            if (index >= closedQuestions.length) {
+                const textarea = document.getElementById('openAnswer');
+                const counter = document.getElementById('charCounter');
+                textarea.addEventListener('input', () => {
+                    const length = textarea.value.length;
+                    counter.innerText = `Caracteres digitados: ${length} / 300 (Mínimo requerido para avanzar)`;
+                    if(length >= 300) {
+                        counter.classList.remove('invalid');
+                        counter.classList.add('valid');
+                    } else {
+                        counter.classList.remove('valid');
+                        counter.classList.add('invalid');
+                    }
+                });
+            }
+
+            questionTimerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimerDisplay();
+                
+                if (timeRemaining <= 0) {
+                    clearInterval(questionTimerInterval);
+                    intentarAvanzar();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            let m = Math.floor(timeRemaining / 60);
+            let s = timeRemaining % 60;
+            let displayStr = `${m < 10 ? '0':''}${m}:${s < 10 ? '0':''}${s}`;
+            document.getElementById('timeDisplay').innerText = displayStr;
+            
+            if(timeRemaining > 0) {
+                document.getElementById('btnNext').innerText = `Tiempo requerido en curso (${displayStr})`;
+            }
+        }
+
+        function intentarAvanzar() {
+            // Validaciones Estrictas antes de auto-avanzar
+            if (currentQuestionIndex >= closedQuestions.length) {
+                let textarea = document.getElementById('openAnswer');
+                let texto = textarea ? textarea.value.trim() : "";
+                
+                // VALIDACIÓN DE LONGITUD: 300 caracteres (~5 líneas)
+                if (texto.length < 300) {
+                    alert("🛑 ¡ALERTA DE DESARROLLO INSUFICIENTE! 🛑\n\nEl tiempo se ha agotado, pero tu respuesta es demasiado corta. Para poder avanzar a la siguiente pregunta, ES OBLIGATORIO que desarrolles tu respuesta con una extensión mínima aproximada de 5 líneas completas (300 caracteres).\n\nEl sistema permanecerá bloqueado en esta pregunta hasta que amplíes tu justificación de manera sustancial.");
+                    
+                    // Modificar botón para que el estudiante deba presionarlo manualmente tras corregir
+                    const btn = document.getElementById('btnNext');
+                    btn.disabled = false;
+                    btn.innerText = "He completado las 5 líneas. Intentar Avanzar Nuevamente";
+                    btn.style.background = "var(--danger)";
+                    btn.onclick = function() {
+                        let nuevotexto = document.getElementById('openAnswer').value.trim();
+                        if(nuevotexto.length >= 300) {
+                            btn.onclick = null; // quitar listener temporal
+                            procesarAvance();
+                        } else {
+                            alert("Aún no cumples con el mínimo de 5 líneas de argumentación requeridas. Continúa escribiendo.");
+                        }
+                    };
+                    return; // Detiene el auto-avance
+                }
+            }
+            
+            // Si es cerrada o la abierta cumple los requisitos, avanza normal
+            procesarAvance();
+        }
+
+        function procesarAvance() {
+            // Guardar respuestas
+            if (currentQuestionIndex < closedQuestions.length) {
+                let selected = document.querySelector('input[name="currentQ"]:checked');
+                answersClosed[currentQuestionIndex] = selected ? parseInt(selected.value) : null;
+            } else {
+                let openIndex = currentQuestionIndex - closedQuestions.length;
+                let textarea = document.getElementById('openAnswer');
+                answersOpen[openIndex] = textarea ? textarea.value.trim() : "(No capturado)";
+            }
+
+            // Cambiar o terminar
+            if (currentQuestionIndex + 1 < totalQuestions) {
+                loadQuestion(currentQuestionIndex + 1);
+            } else {
+                endExam(false); 
+            }
+        }
+
+        // --- FINALIZACIÓN Y REPORTES EN PDF / QR ---
+        function endExam(isForced) {
+            isExamActive = false;
+            isMicActive = false;
+            clearInterval(questionTimerInterval);
+            if(audioContext) audioContext.close();
+
+            // Calcular nota parte cerrada
+            let correctas = 0;
+            answersClosed.forEach((ans, idx) => {
+                if(ans !== null && ans === closedQuestions[idx].ans) {
+                    correctas++;
+                }
+            });
+
+            // Escala 5.0 - Penalidad (Solo aplica a parte cerrada según instrucción)
+            let rawScore = (correctas / closedQuestions.length) * 5.0;
+            let notaFinal = rawScore - penalty;
+            if(notaFinal < 1.0) notaFinal = 1.0;
+
+            document.getElementById('examScreen').classList.add('hidden');
+            document.getElementById('topBar').classList.add('hidden');
+
+            const statusText = isForced && warnings >= 2 ? "EXAMEN ANULADO (INFRACCIÓN DE PESTAÑA)" : "PRUEBA COMPLETADA EXITOSAMENTE";
+            const dateStr = new Date().toLocaleString();
+
+            // Generar Texto Base
+            let txtContent = `=== INFORME EXAMEN CIENCIAS DE LA CREACIÓN ===\n`;
+            txtContent += `ESTUDIANTE: ${studentName}\nESTADO: ${statusText}\nFALTAS: ${warnings}\n`;
+            txtContent += `NOTA PARTE CERRADA: ${notaFinal.toFixed(1)}/5.0 (-${penalty.toFixed(1)} Puntos Castigo)\n`;
+            txtContent += `ACIERTOS: ${correctas}/${closedQuestions.length}\n\n`;
+            txtContent += `--- RESPUESTAS PARTE ABIERTA ---\n`;
+            answersOpen.forEach((ans, idx) => {
+                txtContent += `PREGUNTA ${idx+16}:\n${ans}\n\n`;
+            });
+
+            // Pantallas de Fin
+            if (isForced && warnings >= 2) {
+                document.getElementById('overlay-blocker').classList.remove('hidden');
+                generarQR("qr-failed", txtContent, "#d32f2f");
+            } else {
+                document.getElementById('resultScreen').classList.remove('hidden');
+                document.getElementById('finalScore').innerText = `${notaFinal.toFixed(1)} / 5.0`;
+                generarQR("qr-success", txtContent, "#00509e");
+            }
+
+            // Generador de PDF
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Portada y Datos PDF
+            doc.setFontSize(16);
+            doc.text("Gimnasio Cristiano Faro de Luz - The Lighthouse School", 20, 20);
+            doc.setFontSize(14);
+            doc.setTextColor(0, 51, 102); // Primary color
+            doc.text("Reporte: Examen Acumulativo Ciencias de la Creación 6°", 20, 30);
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            doc.text(`Nombre del Estudiante: ${studentName}`, 20, 45);
+            doc.text(`Fecha de Finalización: ${dateStr}`, 20, 53);
+            if(isForced) { doc.setTextColor(200, 0, 0); }
+            doc.text(`Estado del Protocolo de Seguridad: ${statusText}`, 20, 61);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Cantidad de Infracciones Registradas: ${warnings}`, 20, 69);
+            
+            doc.text(`Aciertos Selección Múltiple: ${correctas}/15 Preguntas`, 20, 77);
+            
+            doc.setFontSize(14);
+            doc.setTextColor(244, 180, 26); // Accent color
+            doc.text(`CALIFICACIÓN PREGUNTAS CERRADAS: ${notaFinal.toFixed(1)} / 5.0`, 20, 90);
+            
+            // Respuestas Abiertas PDF
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            doc.text("=== REGISTRO DE PREGUNTAS DE DESARROLLO (ABIERTAS) ===", 20, 105);
+            doc.setFontSize(10);
+            
+            let currentY = 115;
+            answersOpen.forEach((ans, idx) => {
+                if(currentY > 260) { doc.addPage(); currentY = 20; }
+                doc.setFont(undefined, 'bold');
+                doc.text(`Respuesta a la Pregunta ${idx+16}:`, 20, currentY);
+                doc.setFont(undefined, 'normal');
+                
+                // Formateo de texto largo en el PDF
+                let textToPrint = ans || "(El sistema cerró el examen antes de capturar esta respuesta)";
+                let splitText = doc.splitTextToSize(textToPrint, 170);
+                currentY += 7;
+                doc.text(splitText, 20, currentY);
+                currentY += (splitText.length * 5) + 10;
+            });
+
+            doc.save(`Examen_Taxonomia_6to_${studentName.replace(/\s+/g,'_')}.pdf`);
+        }
+
+        // Generador de QR adaptado para largas extensiones de texto
+        function generarQR(elementId, textData, colorHex) {
+            // El nivel Low (L) permite hasta ~2900 caracteres alfanuméricos. Recortamos por precaución a 2000.
+            let safeText = textData.length > 2000 ? textData.substring(0, 2000) + "\n\n...(DOCUMENTO RECORTADO POR LÍMITE QR. VER PDF PARA TEXTO COMPLETO)" : textData;
+            
+            new QRCode(document.getElementById(elementId), {
+                text: safeText,
+                width: 350, 
+                height: 350, 
+                colorDark : colorHex,
+                correctLevel : QRCode.CorrectLevel.L
+            });
+        }
+    </script>
+</body>
+</html>
